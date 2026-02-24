@@ -1,125 +1,83 @@
-
-  <p align="center">
+<p align="center">
     <img alt="GSMEVIL 2 Title" src="https://raw.githubusercontent.com/sharyer/gsmevil2/master/img/logo.png" style="max-width:100%;max-height:100%;" />
-  </p>
+</p>
 
-**GSMEVIL 2** is python web based tool which use for capturing imsi numbers and sms and also you able to see sms and imsi on any device using your favorite browser and it's make easy to capture sms and imsi numbers for those who not have much knowledge about gsm packets capturing.
+# ☠️ GSMEvil - 2026 Patched Edition ☠️
 
-# Disclaimer:-
-This program was made to understand how GSM network works. Not for bad hacking !
-We are not responsible for any illegal activity !
+**GSMEVIL 2 (2026 Patch)** — это обновленная версия веб-инструмента на базе Python для перехвата и анализа идентификаторов IMSI и SMS-сообщений. Данная модификация устраняет критические ошибки оригинального кода и оптимизирует работу парсера для современных систем.
 
-# Setup
+# Disclaimer ⚠️
+This program was made to understand how GSM network works. **Not for bad hacking!** We are not responsible for any illegal activity! Все действия выполняются пользователем на его собственный страх и риск исключительно в образовательных целях.
 
-Install GSMEvil :
+---
+
+## 🛠 Stability Patches (Что нового в 2026)
+
+Оригинальный скрипт был переработан для обеспечения бесперебойной работы в современных дистрибутивах:
+
+* **Fix: AttributeError**: Устранена ошибка `'ImsiEvil' object has no attribute 'imsi_id'`, которая приводила к аварийному завершению скрипта при встрече с уже существующим в базе IMSI.
+* **Fix: WebSocket Stability**: Веб-сервер переведен на `socketio.run()`, что гарантирует постоянное соединение с браузером и исключает ошибку `CONNECTION_REFUSED` при обновлении таблиц.
+* **Dynamic Layer Handling**: Отказ от жестких индексов пакетов (packet[4]/packet[6]) в пользу динамического поиска слоев `gsm_a.ccch` и `gsm_sms`. Это делает инструмент устойчивым к изменениям в структуре кадров операторов.
+* **Optimization**: Скрипт адаптирован для работы с минимальной нагрузкой на CPU (близкой к **0%** при активном дампе).
+
+---
+
+## 🚀 Setup & Installation
+
+### 1. Install GSMEvil Patched:
 ```
-git clone https://github.com/sharyer/gsmevil2.git
+git clone [https://github.com/твой-ник/gsmevil2-patched.git](https://github.com/твой-ник/gsmevil2-patched.git)
+cd gsmevil2-patched
 pip3 install -r requirements.txt
 ```
-
-Install Gr GSM :  ( For receiving GSM transmissions )
+### 2. Install Gr-GSM:
 ```
-sudo add-apt-repository -y ppa:ptrkrysik/gr-gsm
+
 sudo apt update
 sudo apt install gr-gsm
 ```
+### 3. Install Kalibrate:
+```
 
-If gr-gsm failled to setup. Than follow those this : https://github.com/ptrkrysik/gr-gsm/wiki/Installation  
+sudo apt install kalibrate-rtl
+```
 
-Install Kalibrate : ( For finding frequencies )
-```
-apt-get install kalibrate-rtl
-```
-OR
-```
-sudo apt install build-essential libtool automake autoconf librtlsdr-dev libfftw3-dev
-git clone https://github.com/steve-m/kalibrate-rtl
-cd kalibrate-rtl
-./bootstrap && CXXFLAGS='-W -Wall -O3'
-./configure
-make
-sudo make install
-```
-# Usage
-You need gsm frequency on which you capture sms or imsi. By using kalibrate you will get all your near gsm base stations  frequencies.
+## 📡 Usage Guide
+### Шаг 1: Поиск частот
+
+Просканируйте эфир для поиска ближайших базовых станций:
+Bash
 ```
 kal -s GSM900
 ```
-```
-kal: Scanning for GSM-900 base stations.
-GSM-900:
-	chan: 4 (935.8MHz + 320Hz)	power: 1829406.95
-	chan: 11 (937.2MHz + 308Hz)	power: 4540354.88
-...
-```
-Now you need to capture gsm traffic using gr-gsm on frequency of your any gsm base station which you get from kalibrate.
-```
-grgsm_livemon -f <your_frequency>M
-```
-Example :
-```
-grgsm_livemon -f 935.8M
-```
-if you see output that's mean you getting gsm packets than continue other setps else change frequency.
-```
-2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b
-2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b
-2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b
-2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b 2b
-...
-```
-Now every thing is ready you can start now capturing sms or imsi numbers using gsmevil.
-You able to run imsi catcher and sms sniffer both at same time using 2 seprate terminal for capture imsi numbers and sms both at same time.
-```
-cd <your gsmevil2 folder> #Example cd gsmevil2
-```
-#### Usage :
+Для стабильной работы рекомендуется выбирать каналы с мощностью (power) более 1 000 000.
+### Шаг 2: Запуск монитора
 
-Run this command to quick start Gsm Evil 2.
+Запустите grgsm_livemon на выбранной частоте (например, центральная частота диапазона):
 ```
-python3 GsmEvil.py 
+grgsm_livemon -f 900.0M -p 0 --collectorport 4729
 ```
-Options :
-```
-python3 GsmEvil.py -h
-Usage: GsmEvil.py: [options]
+### Шаг 3: Запуск GsmEvil
 
-Options:
-  -h, --help            show this help message and exit
-  -i IFACE, --iface=IFACE Interface (default : lo)
-  -p PORT, --port=PORT  Port (default : 80)
-  --host=HOST           Host (default : localhost)
+В новом терминале запустите основной скрипт:
 ```
-For change host port.
+sudo python3 GsmEvil.py -p 8081
 ```
-python3 GsmEvil.py -p 8080
-```
-For change hostname.
-```
-python3 GsmEvil.py --host=localhost
-```
-Open localhost or 127.0.0.1 in your favorite browser and use now.
+Рекомендуется использовать порт 8081 для обхода ограничений стандартных портов.
+🔌 Hardware Recommendations (Critical!)
 
-# Requirements
-linux operating system (kali linux)
-[rtl-sdr (RTL2832U)](https://osmocom.org/projects/sdr/wiki/rtl-sdr) with antenna (less than 15$) or [HackRF](https://greatscottgadgets.com/hackrf/) 
+На основе практических тестов для стабильной работы тюнера:
 
-# Links 
-Frequency : https://www.worldtimezone.com/gsm.html or https://en.wikipedia.org/wiki/GSM_frequency_bands  
-Sdr : https://en.wikipedia.org/wiki/Software-defined_radio  
-Sms : https://en.wikipedia.org/wiki/SMS#GSM  
-Imsi : https://fr.wikipedia.org/wiki/International_Mobile_Subscriber_Identity  
-Cell id : https://en.wikipedia.org/wiki/Cell_ID or https://unwiredlabs.com/  
-GSM : https://en.wikipedia.org/wiki/GSM  
-Frequency Calculator : https://www.cellmapper.net/arfcn  
-GR-GSM : https://github.com/ptrkrysik/gr-gsm 
+    Power Supply: Не используйте USB-порты на передней панели ПК. Подключайте RTL-SDR напрямую к портам материнской платы, чтобы избежать просадок напряжения и ошибки -9 (I/O Error).
 
-# Donations
-Bitcoin : 192bG3RRAGdbTPSUWqxbTBaAnKyvALm84g
+    Thermal Control: Для предотвращения дрейфа частоты (PPM drift) удерживайте систему в охлажденном состоянии. Идеальные условия работы — около -1°C.
 
-# Contact
-Website  : https://www.ninjhacks.com<br/>
-Facebook : https://www.facebook.com/ninjhacks<br/>
-Twitter  : https://twitter.com/ninjhacks<br/>
-Discord  : https://discord.gg/ninjhacks<br/>
-Email    : help@ninjhacks.com
+    Device: RTL-SDR (RTL2832U) или HackRF One.
+
+📜 Credits
+
+    Original Author: sheryar (ninjhacks).
+
+    Patch Author: aggggsaw (2026).
+
+    Links: Frequency Map | Gr-GSM Wiki

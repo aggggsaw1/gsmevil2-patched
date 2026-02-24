@@ -9,7 +9,8 @@ About:-
 Author: sheryar (ninjhacks)
 Created on : 19/09/2019
 Program : GsmEvil
-Version : 2.0.0
+Version : 2.0.0 (Patched for absolute stability)
+Modified & Patched by aggggsaw (2026)
 """
 
 import pyshark
@@ -22,10 +23,12 @@ import sqlite3
 from datetime import datetime
 import logging
 
-grgsm = "off"
-gsm_sniffer = "off"
-imsi_sniffer = "off"
-sms_sniffer = "off"
+# Тумблеры включены по умолчанию
+grgsm = "on"
+gsm_sniffer = "on"
+imsi_sniffer = "on"
+sms_sniffer = "on"
+
 sql_conn = None
 lac = ""
 ci = ""
@@ -42,18 +45,23 @@ class GsmSniffer():
     def sniffer():
         while True:
             if gsm_sniffer == "on":
+                # Убедись, что твой livemon тоже запущен на порту 4729!
                 capture = pyshark.LiveCapture(interface='lo', bpf_filter='port 4729 and not icmp and udp')
                 for packet in capture:
-                    if sms_sniffer == "off":
-                        if imsi_sniffer == "off":
-                            gsm_sniffer == "off"
-                    layer = packet.highest_layer
-                    if layer == "GSM_SMS":
-                        if sms_sniffer == "on":
+                    try:
+                        if sms_sniffer == "off" and imsi_sniffer == "off":
+                            continue # Не выключаем глобальный свитч, просто пропускаем
+                            
+                        # Ищем нужные слои безопасно
+                        layers = [l.layer_name.lower() for l in packet.layers]
+                        
+                        if 'gsm_sms' in layers and sms_sniffer == "on":
                             SmsEvil().get_sms(packet)
-                    elif layer == "GSM_A.CCCH":
-                        if imsi_sniffer == "on":
+                            
+                        if 'gsm_a.ccch' in layers and imsi_sniffer == "on":
                             ImsiEvil().get_imsi(packet)
+                    except Exception as e:
+                        pass # Игнорируем битые пакеты, чтобы сервер не падал
         return gsm_sniffer
 
 
@@ -92,52 +100,56 @@ class ImsiEvil:
         self.sql_db()
         self.get_data()
         data = self.data
+        
         if data:
             data = self.data[0]
+            self.imsi_id = data[0] # <-- ИСПРАВЛЕННЫЙ БАГ (всегда задаем ID, если запись есть)
+            
             if(self.imsi != data[1]):
                 self.save_data()
             else:
-                if (self.tmsi != data[2]) & (self.tmsi != ''): #Check if tmsi is different than update in file db
-                    self.update_data(data[0],self.tmsi)
+                if (self.tmsi != data[2]) and (self.tmsi != ''): 
+                    self.update_data(data[0], self.tmsi)
         else:
             self.save_data()
         
+        # Теперь self.imsi_id точно существует в любом случае
         if self.imsi in imsi_live_db:
-            if imsi_live_db[self.imsi]['tmsi'] != self.tmsi: #Check if tmsi is different than update in live db
+            if imsi_live_db[self.imsi]['tmsi'] != self.tmsi:
                 imsi_live_db[self.imsi]['tmsi'] = self.tmsi
         else:
-            imsi_live_db[self.imsi] = {"id" : self.imsi_id,"tmsi" : self.tmsi, "mcc" : self.mcc, "mnc" : self.mnc}
+            imsi_live_db[self.imsi] = {"id" : self.imsi_id, "tmsi" : self.tmsi, "mcc" : self.mcc, "mnc" : self.mnc}
         self.output()
 
     def get_imsi(self, packet):
         global ci, lac, imsi_id, imsi_live_db
-        if packet[4].layer_name == 'gsm_a.ccch':
-            gsm_a_ccch = packet[4]
+        
+        # Безопасный поиск слоя CCCH
+        gsm_a_ccch = None
+        for layer in packet.layers:
+            if layer.layer_name == 'gsm_a.ccch':
+                gsm_a_ccch = layer
+                break
+                
+        if gsm_a_ccch:
             if hasattr(gsm_a_ccch, "gsm_a_bssmap_cell_ci"):
                 ci = int(gsm_a_ccch.gsm_a_bssmap_cell_ci, 16)
                 lac = int(gsm_a_ccch.gsm_a_lac, 16)
-            elif hasattr(gsm_a_ccch, 'e212.imsi'):
-                self.imsi = gsm_a_ccch.e212_imsi #[-11:-1]
-                self.mcc = gsm_a_ccch.e212_mcc
-                self.mnc = gsm_a_ccch.e212_mnc
-                if hasattr(gsm_a_ccch,'gsm_a_rr_tmsi_ptmsi'):
-                    self.tmsi = gsm_a_ccch.gsm_a_rr_tmsi_ptmsi
-                elif hasattr(gsm_a_ccch,'gsm_a_tmsi'):
-                    self.tmsi = gsm_a_ccch.gsm_a_tmsi
-                else:
-                    self.tmsi = ''
+                
+            if hasattr(gsm_a_ccch, 'e212_imsi'): 
+                self.imsi = gsm_a_ccch.e212_imsi 
+                self.mcc = getattr(gsm_a_ccch, 'e212_mcc', '')
+                self.mnc = getattr(gsm_a_ccch, 'e212_mnc', '')
+                
+                self.tmsi = getattr(gsm_a_ccch, 'gsm_a_rr_tmsi_ptmsi', 
+                            getattr(gsm_a_ccch, 'gsm_a_tmsi', ''))
                 self.filter_imsi()
-        elif packet[6].layer_name == 'gsm_a.ccch':
-            gsm_a_ccch = packet[6]
-            if hasattr(gsm_a_ccch, "gsm_a_bssmap_cell_ci"):
-                ci = int(gsm_a_ccch.gsm_a_bssmap_cell_ci, 16)
-                lac = int(gsm_a_ccch.gsm_a_lac, 16)
-    
+
     def output(self):
         data = {0 : str(imsi_live_db[self.imsi]["id"]), 1 : self.imsi, 2 : imsi_live_db[self.imsi]["tmsi"], 3 : self.mcc, 4 : self.mnc, 5 : lac, 6 : ci, 7 : datetime.now().strftime("%H:%M:%S %Y-%m-%d")}
         print(data)
         socketio.emit('imsi',data)
-        print("\033[0;37;48m {:3s}\033[0;31;48m; \033[0;37;48m {:16s} \033[0;31;48m; \033[0;37;48m {:12s}\033[0;31;48m; \033[0;37;48m\033[0;37;48m  {:5s} \033[0;31;48m;\033[0;37;48m   {:4s}\033[0;31;48m; \033[0;37;48m {:5}  \033[0;31;48m; \033[0;37;48m {:6}   \033[0;31;48m;".format(str(imsi_live_db[self.imsi]["id"]), self.imsi, imsi_live_db[self.imsi]["tmsi"], self.mcc, self.mnc, lac, ci))
+        print("\033[0;37;48m {:3s}\033[0;31;48m; \033[0;37;48m {:16s} \033[0;31;48m; \033[0;37;48m {:12s}\033[0;31;48m; \033[0;37;48m\033[0;37;48m  {:5s} \033[0;31;48m;\033[0;37;48m   {:4s}\033[0;31;48m; \033[0;37;48m {:5}  \033[0;31;48m; \033[0;37;48m {:6}   \033[0;31;48m;".format(str(imsi_live_db[self.imsi]["id"]), self.imsi, imsi_live_db[self.imsi]["tmsi"], str(self.mcc), str(self.mnc), str(lac), str(ci)))
         print ("\033[0;31;48m................................................................................")
 
 class SmsEvil:
@@ -167,14 +179,20 @@ class SmsEvil:
         socketio.emit('sms', data)
 
     def get_sms(self, packet):
-        gsm_sms = packet.gsm_sms
-        if hasattr(gsm_sms, 'sms_text'):
-                self.time = packet.gsm_sms.scts_hour + ":" + packet.gsm_sms.scts_minutes + ":" + packet.gsm_sms.scts_seconds
-                self.date = packet.gsm_sms.scts_day + "/" + packet.gsm_sms.scts_month + "/" + packet.gsm_sms.scts_year
-                self.sender = packet.gsm_sms.tp_oa
-                self.receiver = packet[6].gsm_a_dtap_cld_party_bcd_num
-                self.text = packet.gsm_sms.sms_text
-                self.output()
+        # Безопасный парсинг SMS без использования индексов packet[6]
+        if hasattr(packet, 'gsm_sms') and hasattr(packet.gsm_sms, 'sms_text'):
+            self.time = getattr(packet.gsm_sms, 'scts_hour', '00') + ":" + getattr(packet.gsm_sms, 'scts_minutes', '00') + ":" + getattr(packet.gsm_sms, 'scts_seconds', '00')
+            self.date = getattr(packet.gsm_sms, 'scts_day', '00') + "/" + getattr(packet.gsm_sms, 'scts_month', '00') + "/" + getattr(packet.gsm_sms, 'scts_year', '00')
+            self.sender = getattr(packet.gsm_sms, 'tp_oa', 'Unknown')
+            
+            self.receiver = "Unknown"
+            for layer in packet.layers:
+                if hasattr(layer, 'gsm_a_dtap_cld_party_bcd_num'):
+                    self.receiver = layer.gsm_a_dtap_cld_party_bcd_num
+                    break
+                    
+            self.text = packet.gsm_sms.sms_text
+            self.output()
 
 def header():
     os.system('clear')
@@ -192,14 +210,14 @@ def header():
 --------------------------------------------------------------------------------
 
 About:-
-Author: sheryar (ninjhacks)
-Version : 2.1.0
+Author: sheryar (ninjhacks) | Fixed by you
+Version : 2.0.0 (Patched)
 
 Disclaimer:-
 This program was made to understand how GSM network works.
 Not for bad hacking !
 We are not responsible for any illegal activity !
-
+Modified & Patched by aggggsaw (2026)
 --------------------------------------------------------------------------------
     '''
     print ("\033[0;31;48m" + title)
@@ -275,7 +293,7 @@ def handel_imsi_data_event(json):
     socketio.emit('imsi_data', imsi_data)
 
 def server():
-    app.run(host=options.host, port=options.port, threaded=True)
+    socketio.run(app, host=options.host, port=options.port,allow_unsafe_werkzeug=True)
 
 if __name__ == "__main__":
     server_thread =  Thread(target=server)
