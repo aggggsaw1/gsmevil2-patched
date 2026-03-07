@@ -17,7 +17,7 @@ import pyshark
 from optparse import OptionParser
 import os, sys
 from flask import Flask, render_template, request
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO
 from threading import Thread, Event
 import sqlite3
 from datetime import datetime
