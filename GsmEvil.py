@@ -43,6 +43,8 @@ time = ""
 class GsmSniffer():
     
     def sniffer():
+        sms_evil = SmsEvil()
+        imsi_evil = ImsiEvil()
         while True:
             if gsm_sniffer == "on":
                 # Убедись, что твой livemon тоже запущен на порту 4729!
@@ -56,10 +58,10 @@ class GsmSniffer():
                         layers = [l.layer_name.lower() for l in packet.layers]
                         
                         if 'gsm_sms' in layers and sms_sniffer == "on":
-                            SmsEvil().get_sms(packet)
+                            sms_evil.get_sms(packet)
                             
                         if 'gsm_a.ccch' in layers and imsi_sniffer == "on":
-                            ImsiEvil().get_imsi(packet)
+                            imsi_evil.get_imsi(packet)
                     except Exception as e:
                         pass # Игнорируем битые пакеты, чтобы сервер не падал
         return gsm_sniffer
@@ -67,9 +69,13 @@ class GsmSniffer():
 
 class ImsiEvil:
 
+    def __init__(self):
+        self.sql_conn = None
+
     def sql_db(self):
-        self.sql_conn = sqlite3.connect('database/imsi.db')
-        self.sql_conn.execute('CREATE TABLE IF NOT EXISTS imsi_data(id INTEGER PRIMARY KEY, imsi TEXT, tmsi TEXT, mcc INTEGER, mnc INTEGER, lac INTEGER, ci INTEGER, date_time timestamp)')
+        if self.sql_conn is None:
+            self.sql_conn = sqlite3.connect('database/imsi.db')
+            self.sql_conn.execute('CREATE TABLE IF NOT EXISTS imsi_data(id INTEGER PRIMARY KEY, imsi TEXT, tmsi TEXT, mcc INTEGER, mnc INTEGER, lac INTEGER, ci INTEGER, date_time timestamp)')
 
     def save_data(self):
         date_time = datetime.now().strftime("%H:%M:%S %Y-%m-%d")
@@ -154,9 +160,13 @@ class ImsiEvil:
 
 class SmsEvil:
 
+    def __init__(self):
+        self.sql_conn = None
+
     def sql_db(self):
-        self.sql_conn = sqlite3.connect('database/sms.db')
-        self.sql_conn.execute('CREATE TABLE IF NOT EXISTS sms_data(id INTEGER PRIMARY KEY, text TEXT, sender TEXT, receiver TEXT , date_time timestamp)')
+        if self.sql_conn is None:
+            self.sql_conn = sqlite3.connect('database/sms.db')
+            self.sql_conn.execute('CREATE TABLE IF NOT EXISTS sms_data(id INTEGER PRIMARY KEY, text TEXT, sender TEXT, receiver TEXT , date_time timestamp)')
 
     def get_all_data(self):
         self.sql_db()
