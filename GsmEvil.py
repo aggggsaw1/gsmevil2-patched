@@ -303,7 +303,7 @@ def handel_imsi_data_event(json):
     socketio.emit('imsi_data', imsi_data)
 
 def server():
-    socketio.run(app, host=options.host, port=options.port,allow_unsafe_werkzeug=True)
+    socketio.run(app, host=options.host, port=options.port)
 
 if __name__ == "__main__":
     server_thread =  Thread(target=server)
